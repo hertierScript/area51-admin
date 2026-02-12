@@ -17,7 +17,9 @@ const supabase = createServerClient(
 export async function GET() {
   const { data, error } = await supabase
     .from("orders")
-    .select("*, customer:customers(name, email, phone), items:order_items(*)")
+    .select(
+      "*, customer:customers(name, email, phone), order_items(*, menu_item:menu_items(name))",
+    )
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -35,7 +37,7 @@ export async function PATCH(request: Request) {
     if (!orderId || !status) {
       return NextResponse.json(
         { error: "orderId and status are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -52,7 +54,7 @@ export async function PATCH(request: Request) {
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to update order" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Order, OrderItem } from "@/types/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,72 +46,18 @@ interface OrderWithItems extends Order {
   order_items?: (OrderItem & { menu_item?: { name: string } })[];
 }
 
-// Audio context ref for notifications
-let audioContextRef: AudioContext | null = null;
-
-// Initialize audio context on user interaction
-function initAudio(): boolean {
-  if (typeof window !== "undefined" && !audioContextRef) {
-    try {
-      audioContextRef = new (
-        window.AudioContext ||
-        (
-          window as unknown as {
-            webkitAudioContext: typeof window.AudioContext;
-          }
-        ).webkitAudioContext
-      )();
-      return true;
-    } catch (err) {
-      console.error("AudioContext not supported:", err);
-      return false;
-    }
-  }
-  return true;
+// Play bell.mp3 sound
+function playBellSound() {
+  const audio = new Audio("/bell.mp3");
+  audio.volume = 0.8;
+  audio.play().catch((err) => {
+    console.error("Failed to play bell sound:", err);
+  });
 }
 
-// Beep sound function
+// Order notification - plays bell sound
 function playOrderNotification() {
-  if (!initAudio()) return;
-
-  const ctx = audioContextRef;
-  if (!ctx) return;
-
-  // Resume context if suspended (required by browsers)
-  if (ctx.state === "suspended") {
-    ctx.resume().catch(() => {});
-  }
-
-  // Create three beeps
-  const beep1 = ctx.createOscillator();
-  const beep2 = ctx.createOscillator();
-  const beep3 = ctx.createOscillator();
-
-  const gainNode = ctx.createGain();
-
-  beep1.connect(gainNode);
-  beep2.connect(gainNode);
-  beep3.connect(gainNode);
-  gainNode.connect(ctx.destination);
-
-  beep1.frequency.value = 800;
-  beep2.frequency.value = 1000;
-  beep3.frequency.value = 1200;
-
-  beep1.type = "sine";
-  beep2.type = "sine";
-  beep3.type = "sine";
-
-  gainNode.gain.value = 0.3;
-
-  beep1.start(ctx.currentTime);
-  beep1.stop(ctx.currentTime + 0.15);
-
-  beep2.start(ctx.currentTime + 0.2);
-  beep2.stop(ctx.currentTime + 0.35);
-
-  beep3.start(ctx.currentTime + 0.4);
-  beep3.stop(ctx.currentTime + 0.55);
+  playBellSound();
 }
 
 export default function OrdersPage() {

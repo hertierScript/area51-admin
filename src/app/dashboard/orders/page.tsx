@@ -175,6 +175,7 @@ export default function OrdersPage() {
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
+      order.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer?.email
         ?.toLowerCase()
@@ -325,10 +326,17 @@ export default function OrdersPage() {
                       <TableCell>
                         <div>
                           <p className="font-medium">
-                            {order.customer?.name || "Guest"}
+                            {order.customer_name ||
+                              order.customer?.name ||
+                              "Guest"}
                           </p>
+                          {/* <p className="text-sm text-muted-foreground">
+                            {order.customer?.email || "No email"}
+                          </p> */}
                           <p className="text-sm text-muted-foreground">
-                            {order.customer?.email}
+                            {order.customer_phone ||
+                              order.customer?.phone ||
+                              ""}
                           </p>
                         </div>
                       </TableCell>
@@ -475,24 +483,32 @@ export default function OrdersPage() {
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <span className="font-medium text-primary">
-                        {selectedOrder.customer?.name
-                          ?.charAt(0)
-                          .toUpperCase() || "C"}
+                        {(
+                          selectedOrder.customer_name ||
+                          selectedOrder.customer?.name ||
+                          "G"
+                        )
+                          .charAt(0)
+                          .toUpperCase()}
                       </span>
                     </div>
                     <div>
                       <p className="font-medium">
-                        {selectedOrder.customer?.name || "Guest"}
+                        {selectedOrder.customer_name ||
+                          selectedOrder.customer?.name ||
+                          "Guest"}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedOrder.customer?.email}
-                      </p>
+                      {/* <p className="text-sm text-muted-foreground">
+                        {selectedOrder.customer?.email || "No email"}
+                      </p> */}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
-                      {selectedOrder.customer?.phone || "N/A"}
+                      {selectedOrder.customer_phone ||
+                        selectedOrder.customer?.phone ||
+                        "N/A"}
                     </span>
                   </div>
                 </div>

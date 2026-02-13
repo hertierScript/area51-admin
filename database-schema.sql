@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS menu_items (
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+    customer_name VARCHAR(255),
+    customer_phone VARCHAR(20),
+    customer_address TEXT,
     status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled')) DEFAULT 'pending',
     subtotal DECIMAL(10, 2) DEFAULT 0,
     discount_amount DECIMAL(10, 2) DEFAULT 0,

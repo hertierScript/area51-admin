@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Order, OrderItem } from "@/types/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,12 +46,47 @@ interface OrderWithItems extends Order {
   order_items?: (OrderItem & { menu_item?: { name: string } })[];
 }
 
-// Play bell.mp3 sound
+// Play bell.mp3 sound - with proper autoplay handling
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (!audioContext) {
+    try {
+      audioContext = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
+    } catch (e) {
+      console.error("Failed to create audio context:", e);
+      return null;
+    }
+  }
+  return audioContext;
+}
+
 function playBellSound() {
+  // Try using HTML5 Audio first
   const audio = new Audio("/bell.mp3");
   audio.volume = 0.8;
-  audio.play().catch((err) => {
-    console.error("Failed to play bell sound:", err);
+
+  // Attempt to play
+  audio.play().catch(async () => {
+    // If HTML5 audio fails (autoplay policy), try with AudioContext
+    console.log("HTML5 audio failed, trying AudioContext...");
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      const response = await fetch("/bell.mp3");
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await ctx!.decodeAudioData(arrayBuffer);
+      const source = ctx!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx!.destination);
+      source.start(0);
+    } catch (err) {
+      console.error("Failed to play bell sound with AudioContext:", err);
+    }
   });
 }
 
@@ -70,8 +105,40 @@ export default function OrdersPage() {
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true);
-  const [lastOrderCount, setLastOrderCount] = useState(0);
+  const [lastOrderTimestamp, setLastOrderTimestamp] = useState<string | null>(
+    null,
+  );
+  const lastOrderIdsRef = useRef<Set<string>>(new Set());
   const [newOrdersCount, setNewOrdersCount] = useState(0);
+
+  // Initialize audio context on first user interaction to bypass autoplay policies
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === "suspended") {
+          await ctx.resume();
+        }
+      } catch (e) {
+        console.log("Audio initialization deferred until user interaction");
+      }
+    };
+
+    // Listen for first user interaction to initialize audio
+    const handleInteraction = () => {
+      initAudio();
+      document.removeEventListener("click", handleInteraction);
+      document.removeEventListener("keydown", handleInteraction);
+    };
+
+    document.addEventListener("click", handleInteraction);
+    document.addEventListener("keydown", handleInteraction);
+
+    return () => {
+      document.removeEventListener("click", handleInteraction);
+      document.removeEventListener("keydown", handleInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -101,7 +168,16 @@ export default function OrdersPage() {
       console.log("Orders fetched successfully:", result.data);
       const newOrders = result.data || [];
       setOrders(newOrders);
-      setLastOrderCount(newOrders.length);
+
+      // Track the latest order timestamp and IDs
+      if (newOrders.length > 0) {
+        const latestOrder = newOrders[0]; // Orders are sorted by newest first
+        setLastOrderTimestamp(latestOrder.created_at);
+        // Store all current order IDs in ref
+        lastOrderIdsRef.current = new Set<string>(
+          newOrders.map((o: OrderWithItems) => o.id),
+        );
+      }
     } catch (err) {
       console.error("Error fetching orders:", err);
       toast.error("Failed to fetch orders");
@@ -120,29 +196,66 @@ export default function OrdersPage() {
       }
 
       const newOrders = result.data || [];
+      const newOrderIds = new Set<string>(
+        newOrders.map((o: OrderWithItems) => o.id),
+      );
 
-      // Check if there are new orders
-      if (newOrders.length > lastOrderCount && lastOrderCount > 0) {
-        const newCount = newOrders.length - lastOrderCount;
-        setNewOrdersCount(newCount);
-        playOrderNotification();
-        toast.success(
-          `${newCount} new order${newCount > 1 ? "s" : ""} received!`,
-          {
-            duration: 5000,
-          },
-        );
+      // Check if there are new orders by comparing IDs
+      let newCount = 0;
+      if (lastOrderIdsRef.current.size > 0) {
+        // Find orders that weren't in the previous list
+        newCount = newOrders.filter(
+          (order: OrderWithItems) => !lastOrderIdsRef.current.has(order.id),
+        ).length;
+
+        if (newCount > 0) {
+          console.log("New orders detected:", newCount);
+
+          // Ensure audio context is ready before playing
+          const ctx = getAudioContext();
+          if (ctx && ctx.state === "suspended") {
+            ctx.resume().then(() => playOrderNotification());
+          } else {
+            // Play notification sound
+            playOrderNotification();
+          }
+
+          setNewOrdersCount((prev) => prev + newCount);
+          toast.success(
+            `${newCount} new order${newCount > 1 ? "s" : ""} received!`,
+            {
+              duration: 5000,
+            },
+          );
+        }
+      }
+
+      // Update the tracked order IDs
+      lastOrderIdsRef.current = newOrderIds;
+
+      // Also update timestamp as backup
+      if (newOrders.length > 0) {
+        const latestOrder = newOrders[0];
+        setLastOrderTimestamp(latestOrder.created_at);
       }
 
       setOrders(newOrders);
-      setLastOrderCount(newOrders.length);
     } catch (err) {
+      console.error("Error in auto-refresh:", err);
       // Silent fail for auto-refresh
     }
   }
 
   function testSound() {
-    playOrderNotification();
+    // Initialize audio context first if needed
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().then(() => {
+        playOrderNotification();
+      });
+    } else {
+      playOrderNotification();
+    }
     toast.info("Test sound played!", { duration: 2000 });
   }
 

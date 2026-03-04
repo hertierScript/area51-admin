@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import OrderNotification from "@/components/OrderNotification";
 
 const navItems = [
   {
@@ -223,6 +224,9 @@ export default function DashboardLayout({
         <main className="min-h-[calc(100vh-4rem)] lg:min-h-screen">
           {children}
         </main>
+
+        {/* Global order notification - works across all dashboard pages */}
+        <OrderNotification />
       </div>
     </div>
   );
